@@ -3,7 +3,7 @@ import { Upload, Heart, MessageCircle, Share2, Send } from "lucide-react";
 
 const styles = {
   container: {
-    maxWidth: "800px",
+    maxWidth: "720px",
     margin: "0 auto",
     padding: "20px",
   },
@@ -75,6 +75,63 @@ const styles = {
     borderRadius: "12px",
     boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)",
     marginBottom: "24px",
+  },
+  entriesGrid: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '20px',
+  },
+  entryCard: {
+    backgroundColor: 'white',
+    padding: '18px',
+    borderRadius: '12px',
+    boxShadow: '0 6px 18px -8px rgba(0,0,0,0.12)',
+    transition: 'transform 0.12s ease, box-shadow 0.12s ease',
+    cursor: 'pointer'
+  },
+  entryCardHeader: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: '12px'
+  },
+  entryTitle: {
+    fontSize: '16px',
+    fontWeight: 700,
+    margin: 0,
+    color: '#111827'
+  },
+  sentimentBadge: {
+    padding: '6px 10px',
+    borderRadius: '9999px',
+    fontSize: '12px',
+    color: 'white',
+    fontWeight: 600
+  },
+  entryContent: {
+    color: '#374151',
+    marginBottom: '12px',
+    lineHeight: 1.5
+  },
+  entryMeta: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    fontSize: '13px',
+    color: '#9ca3af'
+  },
+  emotionTags: {
+    marginTop: '12px',
+    display: 'flex',
+    gap: '8px',
+    flexWrap: 'wrap'
+  },
+  emotionTag: {
+    padding: '4px 10px',
+    backgroundColor: '#eef2ff',
+    color: '#3730a3',
+    fontSize: '12px',
+    borderRadius: '9999px'
   },
 
   header: {
@@ -197,6 +254,20 @@ const styles = {
     border: "1px solid #e5e7eb",
     fontSize: "14px",
   },
+  /* Instagram-like styles */
+  postMedia: {
+    width: '100%',
+    height: 480,
+    backgroundColor: '#111827',
+    borderRadius: 12,
+    overflow: 'hidden',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  postImage: { width: '100%', height: '100%', objectFit: 'cover' },
+  heartOverlay: { position: 'absolute', zIndex: 20, pointerEvents: 'none', transform: 'translate(-50%, -50%)', left: '50%', top: '50%', fontSize: 120, opacity: 0.95, color: 'white', textShadow: '0 6px 30px rgba(0,0,0,0.5)' },
+  viewComments: { color: '#6b7280', fontSize: 13, marginTop: 8, cursor: 'pointer' },
 };
 
 export default function CommunityPage({ currentUser }) {
@@ -206,9 +277,6 @@ export default function CommunityPage({ currentUser }) {
   const [commentInputs, setCommentInputs] = useState({});
   const fileRef = useRef();
 
-  // ---------------------------
-  // CREATE NEW POST
-  // ---------------------------
   const submitPost = () => {
     if (!text.trim() && !media) return;
 
@@ -224,6 +292,7 @@ export default function CommunityPage({ currentUser }) {
         video: videoSrc,
         likes: 0,
         liked: false,
+        showHeart: false,
         comments: [],
       };
 
@@ -254,6 +323,20 @@ export default function CommunityPage({ currentUser }) {
           : p
       )
     );
+  };
+
+  // Double-click / double-tap to like with heart overlay
+  const handleDoubleLike = (postId) => {
+    setPosts(prev => prev.map(p => {
+      if (p.id !== postId) return p;
+      const alreadyLiked = p.liked;
+      return { ...p, liked: true, likes: alreadyLiked ? p.likes : p.likes + 1, showHeart: true };
+    }));
+
+    // clear overlay after short delay
+    setTimeout(() => {
+      setPosts(prev => prev.map(p => p.id === postId ? { ...p, showHeart: false } : p));
+    }, 900);
   };
 
   // ADD COMMENT
@@ -321,110 +404,124 @@ export default function CommunityPage({ currentUser }) {
             </div>
 
             {media && (
-              <p style={{ fontSize: "13px", marginTop: 6 }}>
-                Selected: {media.name}
-              </p>
+              <div style={{ marginTop: 12 }}>
+                <p style={{ fontSize: "13px", marginBottom: 8, color: '#6b7280' }}>
+                  Selected: {media.name}
+                </p>
+                {media.type.startsWith('image/') && (
+                  <img src={URL.createObjectURL(media)} alt="preview" style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8, marginBottom: 8 }} />
+                )}
+                {media.type.startsWith('video/') && (
+                  <video src={URL.createObjectURL(media)} style={{ maxWidth: '100%', maxHeight: 200, borderRadius: 8, marginBottom: 8 }} />
+                )}
+              </div>
             )}
           </div>
         </div>
       </div>
 
-      {/* POSTS */}
-      {posts.map((p) => (
-        <div key={p.id} style={styles.postCard}>
-          <div style={styles.header}>
-            <div style={styles.avatar}>{p.user[0]}</div>
-
-            <div>
-              <p style={styles.username}>{p.user}</p>
-              <p style={styles.timestamp}>{p.timestamp}</p>
-            </div>
-          </div>
-
-          {p.text && <p style={styles.text}>{p.text}</p>}
-          {p.image && <img src={p.image} style={styles.image} />}
-          {p.video && (
-            <video controls style={styles.video}>
-              <source src={p.video} />
-            </video>
-          )}
-
-          <div style={styles.actionRow}>
-            <button
-              style={{
-                ...styles.actionButton,
-                background: p.liked
-                  ? "linear-gradient(90deg,#ff7ab6,#8b5cf6)"
-                  : "transparent",
-                color: p.liked ? "white" : undefined,
-              }}
-              onClick={() => toggleLike(p.id)}
-            >
-              <Heart size={16} /> {p.liked ? "Liked" : "Like"}
-            </button>
-
-            <button
-              style={styles.actionButton}
-              onClick={() =>
-                document
-                  .getElementById(`comment-input-${p.id}`)
-                  ?.focus()
-              }
-            >
-              <MessageCircle size={16} /> Comment
-            </button>
-
-            <button
-              style={styles.actionButton}
-              onClick={() => alert("Share link copied!")}
-            >
-              <Share2 size={16} /> Share
-            </button>
-
-            <div style={styles.likeCount}>
-              {p.likes} {p.likes === 1 ? "like" : "likes"}
-            </div>
-          </div>
-
-          <div style={styles.commentSection}>
-            {p.comments.map((c) => (
-              <div key={c.id} style={styles.commentItem}>
-                <div style={styles.commentAvatar}>{c.user[0]}</div>
-
-                <div style={styles.commentBubble}>
-                  <strong>{c.user}</strong>
-                  <div>{c.text}</div>
+      {/* POSTS as boxed entries grid */}
+      <div style={styles.entriesGrid}>
+        {posts.map((p) => (
+          <div key={p.id} style={{...styles.entryCard, position:'relative'}}>
+            <div style={styles.entryCardHeader}>
+              <div style={{display:'flex', gap:12, alignItems:'center'}}>
+                <div style={{width:44, height:44, borderRadius:'50%', background:'#eef2ff', display:'flex', alignItems:'center', justifyContent:'center', fontWeight:700, color:'#4338ca'}}>{p.user[0]}</div>
+                <div>
+                  <p style={styles.entryTitle}>{p.user}</p>
+                  <div style={{fontSize:12, color:'#6b7280'}}>{p.timestamp}</div>
                 </div>
               </div>
-            ))}
+              <span style={{
+                ...styles.sentimentBadge,
+                ...(p.likes > 0 ? {backgroundColor:'#10b981'} : {backgroundColor:'#6b7280'})
+              }}>{p.likes>0? 'popular' : 'new'}</span>
+            </div>
 
-            <div style={styles.commentComposer}>
-              <input
-                id={`comment-input-${p.id}`}
-                style={styles.commentInput}
-                placeholder="Write a comment..."
-                value={commentInputs[p.id] || ""}
-                onChange={(e) =>
-                  setCommentInputs((prev) => ({
-                    ...prev,
-                    [p.id]: e.target.value,
-                  }))
-                }
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") addComment(p.id);
-                }}
-              />
+            {/* If there's media (image/video) render as a large media post (Instagram-like) */}
+            {(p.image || p.video) ? (
+              <>
+                <div style={{position:'relative', marginBottom: 12}} onDoubleClick={() => handleDoubleLike(p.id)}>
+                  <div style={styles.postMedia}>
+                    {p.video ? (
+                      <video controls src={p.video} style={styles.postImage} />
+                    ) : p.image ? (
+                      <img src={p.image} alt="post" style={styles.postImage} />
+                    ) : null}
+                  </div>
 
-              <button
-                style={styles.actionButton}
-                onClick={() => addComment(p.id)}
-              >
-                <Send size={16} />
-              </button>
+                  {p.showHeart && (
+                    <div style={styles.heartOverlay}>❤️</div>
+                  )}
+                </div>
+
+                {/* caption below media */}
+                {p.text && <p style={styles.entryContent}>{p.text}</p>}
+              </>
+            ) : (
+              /* Text-only post: render as a normal post body */
+              p.text && <p style={styles.entryContent}>{p.text}</p>
+            )}
+
+            <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginTop: (p.image || p.video || p.text) ? 12 : 8}}>
+              <div style={{display:'flex', gap:8}}>
+                <button
+                  style={{
+                    ...styles.actionButton,
+                    background: p.liked ? "linear-gradient(90deg,#ff7ab6,#8b5cf6)" : "transparent",
+                    color: p.liked ? "white" : undefined,
+                  }}
+                  onClick={() => toggleLike(p.id)}
+                >
+                  <Heart size={18} />
+                </button>
+
+                <button style={styles.actionButton} onClick={() => document.getElementById(`comment-input-${p.id}`)?.focus()}>
+                  <MessageCircle size={18} />
+                </button>
+
+                <button style={styles.actionButton} onClick={() => alert('Share link copied!')}>
+                  <Share2 size={18} />
+                </button>
+              </div>
+
+              <div style={{fontWeight:700}}>{p.likes} {p.likes===1? 'like' : 'likes'}</div>
+            </div>
+
+            {/* comments preview */}
+            <div style={{marginTop:10}}>
+              {p.comments.length > 2 && (
+                <div style={styles.viewComments}>View all {p.comments.length} comments</div>
+              )}
+
+              {p.comments.slice(0,2).map(c => (
+                <div key={c.id} style={{display:'flex', gap:8, alignItems:'flex-start', marginTop:8}}>
+                  <div style={styles.commentAvatar}>{c.user[0]}</div>
+                  <div>
+                    <strong style={{display:'block', fontSize:13}}>{c.user}</strong>
+                    <div style={{fontSize:14, color:'#374151'}}>{c.text}</div>
+                  </div>
+                </div>
+              ))}
+
+              <div style={styles.commentComposer}>
+                <input
+                  id={`comment-input-${p.id}`}
+                  style={styles.commentInput}
+                  placeholder="Add a comment..."
+                  value={commentInputs[p.id] || ''}
+                  onChange={(e) => setCommentInputs(prev => ({...prev, [p.id]: e.target.value}))}
+                  onKeyDown={(e) => { if (e.key === 'Enter') addComment(p.id); }}
+                />
+
+                <button style={styles.actionButton} onClick={() => addComment(p.id)}>
+                  <Send size={16} />
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </div>
   );
 }
