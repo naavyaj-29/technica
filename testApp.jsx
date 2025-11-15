@@ -1,4 +1,5 @@
-// App.jsx (or ChefPostingSystem.jsx)
+// App.jsx (ChefPostingSystem)
+
 import React, { useEffect, useState } from "react";
 import styles from "./App.module.css";
 import CommunityPage from "./CommunityPage.jsx";
@@ -24,11 +25,11 @@ import {
 import GlobeView from "./GlobeView.jsx";
 
 // ---- API base URL (frontend <-> backend bridge) ----
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
 
-const API_BASE_URL =
-  import.meta.env?.VITE_API_BASE_URL ||
-  process.env.REACT_APP_API_URL ||
-  "http://localhost:4000";
+// Safely map a tag string into a CSS-friendly key
+const safeTagClass = (tag) =>
+  tag.toLowerCase().replace(/[^a-z0-9]+/g, "_");
 
 const ChefPostingSystem = () => {
   const [currentView, setCurrentView] = useState("feed");
@@ -39,7 +40,6 @@ const ChefPostingSystem = () => {
   const [selectedFilters, setSelectedFilters] = useState([]);
   const [selectedMeal, setSelectedMeal] = useState(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
-  const [showChat, setShowChat] = useState(false);
   const [selectedChat, setSelectedChat] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [chatMessage, setChatMessage] = useState("");
@@ -167,16 +167,14 @@ const ChefPostingSystem = () => {
         const data = await res.json();
         setMeals(data);
         setFilteredMeals(data);
-      }
-      catch (err) {
+      } catch (err) {
         console.error("Error fetching meals, using sample data:", err);
         setMeals(sampleMeals);
         setFilteredMeals(sampleMeals);
       }
     };
 
-    loadMeals();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    fetchMeals();
   }, []);
 
   // --------- Filter + search whenever query / filters change ---------
@@ -189,9 +187,7 @@ const ChefPostingSystem = () => {
         (meal) =>
           meal.title.toLowerCase().includes(q) ||
           (meal.description || "").toLowerCase().includes(q) ||
-          (meal.tags || []).some((tag) =>
-            tag.toLowerCase().includes(q)
-          )
+          (meal.tags || []).some((tag) => tag.toLowerCase().includes(q))
       );
     }
 
@@ -210,33 +206,38 @@ const ChefPostingSystem = () => {
     );
   };
 
-const handleBuyTicket = async (meal) => {
-  if (meal.servingsLeft <= 0) return;
+  const handleBuyTicket = async (meal) => {
+    if (meal.servingsLeft <= 0) return;
 
-  try {
-    const res = await fetch(`${API_BASE}/api/meals/${meal.id}/reserve`, {
-      method: "PATCH",
-    });
-    if (!res.ok) throw new Error("Failed to reserve meal");
-    const updated = await res.json();
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/meals/${meal.id}/reserve`,
+        {
+          method: "PATCH",
+        }
+      );
+      if (!res.ok) throw new Error("Failed to reserve meal");
+      const updated = await res.json();
 
-    // update local state
-    setMeals((prev) =>
-      prev.map((m) => (m.id === updated.id ? updated : m))
-    );
+      // update local state
+      setMeals((prev) =>
+        prev.map((m) => (m.id === updated.id ? updated : m))
+      );
 
-    const note = {
-      id: Date.now(),
-      message: `Successfully reserved ${updated.title}!`,
-      time: new Date(),
-    };
-    setNotifications((prev) => [note, ...prev]);
-    alert(`Meal reserved! You'll receive pickup details soon.`);
-  } catch (err) {
-    console.error(err);
-    alert("Error reserving meal. Please try again.");
-  }
-};
+      const note = {
+        id: Date.now(),
+        message: `Successfully reserved ${updated.title}!`,
+        time: new Date(),
+      };
+      setNotifications((prev) => [note, ...prev]);
+      alert(`Meal reserved! You'll receive pickup details soon.`);
+    } catch (err) {
+      console.error(err);
+      alert("Error reserving meal. Please try again.");
+    }
+  };
+
+  // --------- Views ---------
 
   const LoginView = () => (
     <div className={styles.loginWrapper}>
@@ -538,7 +539,10 @@ const handleBuyTicket = async (meal) => {
       price: "",
       servings: "",
       servingsLeft: "",
+      image: "",
+      originKey: "generic",
       tags: [],
+      culturalNote: "",
     });
 
     const toggleTag = (t) => {
@@ -556,11 +560,24 @@ const handleBuyTicket = async (meal) => {
 
       const newMealPayload = {
         title: formData.title || "Untitled Meal",
-        chef: user.name,
+        description: formData.description || "",
+        chef: user?.name || "Anonymous Chef",
+        chefBio: "Student chef",
+        dorm: user?.dorm || "Unknown Dorm",
         price: Number(formData.price) || 0,
         servings: Number(formData.servings) || 1,
-        servingsLeft: Number(formData.servings) || 1,
+        servingsLeft:
+          Number(formData.servingsLeft || formData.servings) || 1,
+        image:
+          formData.image ||
+          "https://images.unsplash.com/photo-1466637574441-749b8f19452f?w=800&h=600&fit=crop",
         tags: formData.tags,
+        culturalNote: formData.culturalNote || "",
+        rating: 5.0,
+        orders: 0,
+        originKey: formData.originKey,
+        lat: origin.lat,
+        lng: origin.lng,
       };
 
       try {
@@ -575,10 +592,8 @@ const handleBuyTicket = async (meal) => {
         setShowCreatePost(false);
         alert("Meal posted successfully!");
       } catch (err) {
-        console.error(
-          "Error saving meal to backend:",
-          err
-        );
+        console.error("Error saving meal to backend:", err);
+        alert("Error posting meal. Please try again.");
       }
     };
 
@@ -621,10 +636,10 @@ const handleBuyTicket = async (meal) => {
               <div className={styles.uploadBox}>
                 <ChefHat className={styles.uploadIcon} />
                 <p className={styles.smallMuted}>
-                  Click to upload or drag and drop
+                  Paste an image URL (for now)
                 </p>
                 <input
-                  className={styles.hiddenFile}
+                  className={styles.input}
                   type="text"
                   placeholder="Image URL (optional)"
                   value={formData.image}
@@ -689,6 +704,7 @@ const handleBuyTicket = async (meal) => {
                 {allTags.map((t) => (
                   <button
                     key={t.name}
+                    type="button"
                     onClick={() => toggleTag(t.name)}
                     className={`${styles.filterTag} ${
                       formData.tags.includes(t.name)
@@ -724,10 +740,15 @@ const handleBuyTicket = async (meal) => {
               style={{ gridColumn: "1 / -1" }}
               className={styles.formActions}
             >
-              <button className={styles.primaryButton} onClick={submit}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={submit}
+              >
                 Post Meal
               </button>
               <button
+                type="button"
                 className={styles.ghostButton}
                 onClick={() => setShowCreatePost(false)}
               >
@@ -744,7 +765,9 @@ const handleBuyTicket = async (meal) => {
     <div className={styles.profileWrapper}>
       <div className={styles.profileCard}>
         <div className={styles.profileTop}>
-          <div className={styles.profileAvatar}>{user.name.charAt(0)}</div>
+          <div className={styles.profileAvatar}>
+            {user.name.charAt(0)}
+          </div>
           <div>
             <h2 className={styles.h2}>{user.name}</h2>
             <p className={styles.smallMuted}>{user.email}</p>
@@ -862,7 +885,9 @@ const handleBuyTicket = async (meal) => {
                   selectedChat?.id === c.id ? styles.chatItemActive : ""
                 }`}
               >
-                <div className={styles.chatAvatar}>{c.name.charAt(0)}</div>
+                <div className={styles.chatAvatar}>
+                  {c.name.charAt(0)}
+                </div>
                 <div className={styles.chatInfo}>
                   <div className={styles.chatTop}>
                     <div className={styles.chatName}>{c.name}</div>
@@ -915,8 +940,9 @@ const handleBuyTicket = async (meal) => {
                   placeholder="Type a message..."
                   value={chatMessage}
                   onChange={(e) => setChatMessage(e.target.value)}
-                  onKeyPress={(e) => {
+                  onKeyDown={(e) => {
                     if (e.key === "Enter" && chatMessage.trim()) {
+                      // no-op send for now
                       setChatMessage("");
                     }
                   }}
@@ -1010,7 +1036,7 @@ const handleBuyTicket = async (meal) => {
             >
               <MessageCircle />
               {notifications.length > 0 && (
-                <span className={styles.badge}>2</span>
+                <span className={styles.badge}>{notifications.length}</span>
               )}
             </button>
 
