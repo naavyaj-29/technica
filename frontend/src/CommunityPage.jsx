@@ -271,7 +271,68 @@ const styles = {
 };
 
 export default function CommunityPage({ currentUser }) {
-  const [posts, setPosts] = useState([]);
+  // Mock sample posts to demonstrate features
+  const mockPosts = [
+    {
+      id: '1',
+      user: 'Sarah Chen',
+      timestamp: '2 hours ago',
+      text: 'Just ate a meal with friends. Tried a new cuisine today!',
+      image: null,
+      video: null,
+      likes: 24,
+      liked: false,
+      showHeart: false,
+      comments: [
+        { id: '1a', user: 'Alex Johnson', text: 'That\'s awesome!' },
+        { id: '1b', user: 'Jordan Lee', text: 'Love it! I wish I could try too.' }
+      ]
+    },
+    {
+      id: '2',
+      user: 'Marcus Thompson',
+      timestamp: '4 hours ago',
+      text: 'Finally tried Biryani. Made me feel at home!',
+      image: 'https://images.unsplash.com/photo-1563379091339-03b21ab4a104?w=800&q=80',
+      video: null,
+      likes: 56,
+      liked: false,
+      showHeart: false,
+      comments: [
+        { id: '2a', user: 'Emma Davis', text: 'That\'s amazing!' },
+      ]
+    },
+    {
+      id: '3',
+      user: 'Nina Patel',
+      timestamp: '6 hours ago',
+      text: 'Tried some homemade herbal tea!',
+      image: 'https://images.unsplash.com/photo-1597318972595-9c87ad0e1ae5?w=800&q=80',
+      video: null,
+      likes: 42,
+      liked: false,
+      showHeart: false,
+      comments: []
+    },
+    {
+      id: '4',
+      user: 'James Wilson',
+      timestamp: '8 hours ago',
+      text: 'Can anyone explain what the origin of Gulab Jamun is?',
+      image: null,
+      video: null,
+      likes: 18,
+      liked: false,
+      showHeart: false,
+      comments: [
+        { id: '4a', user: 'Sarah Chen', text: 'I\'m not sure, I\'d love to hear about it too!' },
+        { id: '4b', user: 'Marcus Thompson', text: 'It was invented in medieval India' },
+        { id: '4c', user: 'Nina Patel', text: 'Yeah but\'s roots are traced back to a Persian dish' }
+      ]
+    }
+  ];
+
+  const [posts, setPosts] = useState(mockPosts);
   const [text, setText] = useState("");
   const [media, setMedia] = useState(null);
   const [commentInputs, setCommentInputs] = useState({});
@@ -435,7 +496,7 @@ export default function CommunityPage({ currentUser }) {
               <span style={{
                 ...styles.sentimentBadge,
                 ...(p.likes > 0 ? {backgroundColor:'#10b981'} : {backgroundColor:'#6b7280'})
-              }}>{p.likes>0? 'popular' : 'new'}</span>
+              }}>{p.likes>10? 'popular' : 'new'}</span>
             </div>
 
             {/* If there's media (image/video) render as a large media post (Instagram-like) */}
