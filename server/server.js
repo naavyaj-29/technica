@@ -126,25 +126,17 @@ app.post("/api/upload", upload.single("image"), (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: "No file uploaded" });
   }
-  // Save relative path so the server can decide the public base later
-  const imagePath = `/uploads/${req.file.filename}`;
-  res.json({ url: imagePath });
+  const imageUrl = `${req.protocol}://${req.get("host")}/uploads/${
+    req.file.filename
+  }`;
+  res.json({ url: imageUrl });
 });
 
 // GET all meals
 app.get("/api/meals", async (req, res) => {
   try {
     const meals = await Meal.find().sort({ createdAt: -1 });
-    // Ensure image URLs are absolute for clients. Use PUBLIC_BASE_URL when set
-    const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get("host")}`;
-    const out = meals.map((m) => {
-      const obj = m.toJSON ? m.toJSON() : { ...m };
-      if (obj.image && !obj.image.startsWith("http")) {
-        obj.image = `${base}${obj.image}`;
-      }
-      return obj;
-    });
-    res.json(out);
+    res.json(meals);
   } catch (err) {
     console.error("Error fetching meals:", err);
     res.status(500).json({ error: "Failed to fetch meals" });
@@ -228,12 +220,7 @@ app.get("/api/users/:id", async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
     if (!user) return res.status(404).json({ error: "User not found" });
-    const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get("host")}`;
-    const obj = user.toJSON ? user.toJSON() : { ...user };
-    if (obj.image && !obj.image.startsWith("http")) {
-      obj.image = `${base}${obj.image}`;
-    }
-    res.json(obj);
+    res.json(user);
   } catch (err) {
     console.error("Error fetching user:", err);
     res.status(500).json({ error: "Failed to fetch user" });
@@ -244,15 +231,7 @@ app.get("/api/users/:id", async (req, res) => {
 app.get("/api/users", async (req, res) => {
   try {
     const users = await User.find().sort({ createdAt: -1 });
-    const base = process.env.PUBLIC_BASE_URL || `${req.protocol}://${req.get("host")}`;
-    const out = users.map((u) => {
-      const obj = u.toJSON ? u.toJSON() : { ...u };
-      if (obj.image && !obj.image.startsWith("http")) {
-        obj.image = `${base}${obj.image}`;
-      }
-      return obj;
-    });
-    res.json(out);
+    res.json(users);
   } catch (err) {
     console.error("Error fetching users:", err);
     res.status(500).json({ error: "Failed to fetch users" });
