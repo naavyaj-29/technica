@@ -9,6 +9,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 import axios from "axios";
 import fs from "fs";
+import generateRoutes from "./generateRoutes.js"; // keep this
 
 dotenv.config();
 
@@ -21,8 +22,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- Static serving for images AND audio ---
-app.use("/uploads", express.static(path.join(__dirname, "uploads"))); 
-// (your image upload folder is also where audio will go)
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+
+// --- Mount generate routes (router file) ---
+app.use("/api/generate", generateRoutes);
 
 // --- Multer storage config for images ---
 const storage = multer.diskStorage({
@@ -238,7 +241,6 @@ app.get("/api/users", async (req, res) => {
   }
 });
 
-
 // --------------------------------------------------
 // ⭐ NEW: GENERATE DISH HISTORY (Gemini + ElevenLabs)
 // --------------------------------------------------
@@ -249,10 +251,15 @@ app.post("/api/generate/history", async (req, res) => {
 
     // Debug: Log the API key being used
     const apiKey = process.env.GEMINI_API_KEY;
-    console.log("🔑 Using Gemini API Key:", apiKey ? `${apiKey.substring(0, 10)}...` : "NOT SET");
-    
+    console.log(
+      "🔑 Using Gemini API Key:",
+      apiKey ? `${apiKey.substring(0, 10)}...` : "NOT SET"
+    );
+
     if (!apiKey) {
-      return res.status(500).json({ error: "GEMINI_API_KEY not set in environment" });
+      return res
+        .status(500)
+        .json({ error: "GEMINI_API_KEY not set in environment" });
     }
 
     // --- Gemini prompt ---
@@ -302,15 +309,20 @@ Cultural note: ${culturalNote}
     });
 
   } catch (err) {
-    console.error("❌ Generation error:", err.response?.status, err.response?.data || err.message);
-    const errorMsg = err.response?.data?.error?.message || err.message || "Failed to generate history";
+    console.error(
+      "❌ Generation error:",
+      err.response?.status,
+      err.response?.data || err.message
+    );
+    const errorMsg =
+      err.response?.data?.error?.message ||
+      err.message ||
+      "Failed to generate history";
     res.status(err.response?.status || 500).json({ error: errorMsg });
   }
 });
 
-
-// --- Start server ---
-const port = process.env.PORT || 4000;
-app.listen(port, () =>
-  console.log(`API listening on http://localhost:${port}`)
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, () =>
+  console.log(`API listening on http://localhost:${PORT}`)
 );
