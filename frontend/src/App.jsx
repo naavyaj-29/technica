@@ -149,14 +149,17 @@ const ChefPostingSystem = () => {
   const allTags = [
     { name: "vegan" },
     { name: "vegetarian" },
-    { name: "halal" },
-    { name: "Punjabi" },
-    { name: "Japanese" },
-    { name: "Middle Eastern" },
-    { name: "Mexican" },
+    { name: "gluten-free" },
+    { name: "sweet" },
     { name: "spicy-mild" },
     { name: "spicy-medium" },
     { name: "spicy-hot" },
+    { name: "halal" },
+    { name: "savory" },
+    { name: "peanut-free" },
+    { name: "plant-based" },
+    { name: "high-protein" },
+    { name: "sugar-free" },
   ];
 
   // --------- Fetch meals from BACKEND on mount ---------
@@ -714,6 +717,13 @@ const ChefPostingSystem = () => {
                 <option value="japanese">Japanese</option>
                 <option value="middle eastern">Middle Eastern</option>
                 <option value="mexican">Mexican</option>
+                <option value="african">African</option>
+                <option value="mediterranean">Mediterranean</option>
+                <option value="vietnamese">Vietnamese</option>
+                <option value="italian">Italian</option>
+                <option value="thai">Thai</option>
+                <option value="egyptian">Egyptian</option>
+                <option value="european">European</option>
               </select>
             </div>
 
@@ -1002,8 +1012,8 @@ const ChefPostingSystem = () => {
               setShowCreatePost(false);
             }}
           >
-            <ChefHat className={styles.brandIcon} />
-            <span className={styles.brandTitle}>Campus Chef</span>
+            <img src="/logo.png" alt="DormDash" className={styles.brandIcon} />
+            <span className={styles.brandTitle}>DormDash</span>
           </div>
 
           <div className={styles.navActions}>
