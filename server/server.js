@@ -86,6 +86,33 @@ mealSchema.set("toJSON", {
 
 const Meal = mongoose.model("Meal", mealSchema);
 
+// --- User Schema / Model ---
+const userSchema = new mongoose.Schema(
+  {
+    name: { type: String, required: true },
+    email: { type: String, required: true, unique: true },
+    phone: String,
+    dorm: { type: String, required: true },
+    bio: String,
+    dietary: [String],
+    role: { type: String, enum: ["buyer", "seller"], required: true },
+    ratings: { type: Number, default: 0 },
+  },
+  { timestamps: true }
+);
+
+// Transform _id -> id for user responses
+userSchema.set("toJSON", {
+  transform: (doc, ret) => {
+    ret.id = ret._id.toString();
+    delete ret._id;
+    delete ret.__v;
+    return ret;
+  },
+});
+
+const User = mongoose.model("User", userSchema);
+
 // --- Routes ---
 
 // Image upload: returns { url } that frontend will save to Mongo
@@ -143,6 +170,66 @@ app.patch("/api/meals/:id/reserve", async (req, res) => {
   } catch (err) {
     console.error("Error reserving meal:", err);
     res.status(500).json({ error: "Failed to reserve meal" });
+  }
+});
+
+// --- User Routes ---
+
+// POST create user (registration)
+app.post("/api/users", async (req, res) => {
+  try {
+    const { name, email, phone, dorm, bio, dietary, role } = req.body;
+
+    // Validate required fields
+    if (!name || !email || !dorm || !role) {
+      return res.status(400).json({ error: "Missing required fields: name, email, dorm, role" });
+    }
+
+    // Check if user already exists
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(409).json({ error: "User with this email already exists" });
+    }
+
+    const newUser = new User({
+      name,
+      email,
+      phone,
+      dorm,
+      bio,
+      dietary: dietary || [],
+      role,
+      ratings: 0,
+    });
+
+    const saved = await newUser.save();
+    res.status(201).json(saved);
+  } catch (err) {
+    console.error("Error creating user:", err);
+    res.status(500).json({ error: "Failed to create user" });
+  }
+});
+
+// GET user by ID
+app.get("/api/users/:id", async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json({ error: "User not found" });
+    res.json(user);
+  } catch (err) {
+    console.error("Error fetching user:", err);
+    res.status(500).json({ error: "Failed to fetch user" });
+  }
+});
+
+// GET all users (optional, for debug/admin)
+app.get("/api/users", async (req, res) => {
+  try {
+    const users = await User.find().sort({ createdAt: -1 });
+    res.json(users);
+  } catch (err) {
+    console.error("Error fetching users:", err);
+    res.status(500).json({ error: "Failed to fetch users" });
   }
 });
 
