@@ -1,16 +1,22 @@
-const express = require("express");
-const router = express.Router();
-const axios = require("axios");
-const fs = require("fs");
-const path = require("path");
+// generateRoutes.js (ES module version)
+import express from "express";
+import axios from "axios";
+import fs from "fs";
+import path from "path";
+import dotenv from "dotenv";
+import { fileURLToPath } from "url";
 
-require("dotenv").config();
+dotenv.config();
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const router = express.Router();
 
 router.post("/history", async (req, res) => {
   try {
     const { title, description, tags, culturalNote } = req.body;
 
-    // ---------------- GEMINI PROMPT ----------------
     const prompt = `
 Write a warm, short (120–180 words) cultural history about this dish.
 
@@ -22,21 +28,28 @@ Cultural note: ${culturalNote}
 Keep it friendly, respectful, and culturally aware.
 `;
 
-    // ---------------- CALL GEMINI ----------------
+    // ---- GEMINI CALL ----
     const geminiResp = await axios.post(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+  `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${process.env.GEMINI_API_KEY}`,
+  {
+    contents: [
       {
-        contents: [{ parts: [{ text: prompt }] }]
-      }
-    );
+        role: "user",
+        parts: [{ text: prompt }],
+      },
+    ],
+  }
+);
+
 
     const generatedText =
       geminiResp.data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
 
-    if (!generatedText)
+    if (!generatedText) {
       return res.status(500).json({ error: "Gemini returned no text" });
+    }
 
-    // ---------------- CALL ELEVEN LABS ----------------
+    // ---- ELEVENLABS TTS ----
     const audioResp = await axios.post(
       "https://api.elevenlabs.io/v1/text-to-speech/pNInz6obpgDQGcFmaJgB",
       { text: generatedText },
@@ -44,12 +57,11 @@ Keep it friendly, respectful, and culturally aware.
         responseType: "arraybuffer",
         headers: {
           "xi-api-key": process.env.ELEVEN_API_KEY,
-          "Content-Type": "application/json"
-        }
+          "Content-Type": "application/json",
+        },
       }
     );
 
-    // Save audio file
     const audioFolder = path.join(__dirname, "uploads");
     if (!fs.existsSync(audioFolder)) fs.mkdirSync(audioFolder);
 
@@ -62,7 +74,7 @@ Keep it friendly, respectful, and culturally aware.
 
     return res.json({
       text: generatedText,
-      audioUrl
+      audioUrl,
     });
   } catch (err) {
     console.error(err);
@@ -70,4 +82,4 @@ Keep it friendly, respectful, and culturally aware.
   }
 });
 
-module.exports = router;
+export default router;
