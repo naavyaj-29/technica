@@ -50,7 +50,7 @@ const RegisterForm = ({ onClose, onSuccess }) => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || "Failed to register");
+        throw new Error(errorData.error || errorData.message || "Failed to register");
       }
 
       const newUser = await response.json();
