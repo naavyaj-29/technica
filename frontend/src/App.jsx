@@ -1,4 +1,5 @@
-// ChefPostingSystem.jsx
+// App.jsx (ChefPostingSystem)
+
 import React, { useEffect, useState } from "react";
 import styles from "./App.module.css";
 import CommunityPage from "./CommunityPage.jsx";
@@ -23,6 +24,13 @@ import {
 
 import GlobeView from "./GlobeView.jsx";
 
+// ---- API base URL (frontend <-> backend bridge) ----
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:4000";
+
+// Safely map a tag string into a CSS-friendly key
+const safeTagClass = (tag) =>
+  tag.toLowerCase().replace(/[^a-z0-9]+/g, "_");
+
 const ChefPostingSystem = () => {
   const [currentView, setCurrentView] = useState("feed");
   const [user, setUser] = useState(null);
@@ -32,7 +40,6 @@ const ChefPostingSystem = () => {
   const [selectedFilters, setSelectedFilters] = useState([]);
   const [selectedMeal, setSelectedMeal] = useState(null);
   const [showCreatePost, setShowCreatePost] = useState(false);
-  const [showChat, setShowChat] = useState(false);
   const [selectedChat, setSelectedChat] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [chatMessage, setChatMessage] = useState("");
@@ -43,10 +50,9 @@ const ChefPostingSystem = () => {
     japanese: { lat: 35.6762, lng: 139.6503 }, // Tokyo, Japan
     "middle eastern": { lat: 30.0444, lng: 31.2357 }, // Cairo-ish
     mexican: { lat: 19.4326, lng: -99.1332 }, // Mexico City
-    generic: { lat: 39.0, lng: 0.0 }, // fallback
   };
 
-  // Sample meals with full fields + cultural origins
+  // Sample fallback meals (used if backend is down / empty)
   const sampleMeals = [
     {
       id: 1,
@@ -62,13 +68,13 @@ const ChefPostingSystem = () => {
       image:
         "https://images.unsplash.com/photo-1603894584373-5ac82b2ae398?w=800&h=600&fit=crop",
       tags: ["Punjabi", "halal", "spicy-medium"],
-      culturalNote:
+      dishMatters:
         "This dish reminds me of family dinners back home. It's comfort food that brings people together!",
       rating: 4.8,
       orders: 24,
       originKey: "punjabi",
-      lat: ORIGIN_COORDS["punjabi"].lat,
-      lng: ORIGIN_COORDS["punjabi"].lng,
+      lat: 31.1471,
+      lng: 75.3412,
     },
     {
       id: 2,
@@ -84,13 +90,13 @@ const ChefPostingSystem = () => {
       image:
         "https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800&h=600&fit=crop",
       tags: ["Japanese", "vegan", "spicy-mild"],
-      culturalNote:
+      dishMatters:
         "Learning to make ramen from scratch connected me to my heritage. Each bowl is made with care!",
       rating: 4.9,
       orders: 31,
       originKey: "japanese",
-      lat: ORIGIN_COORDS["japanese"].lat,
-      lng: ORIGIN_COORDS["japanese"].lng,
+      lat: 35.6762,
+      lng: 139.6503,
     },
     {
       id: 3,
@@ -106,13 +112,13 @@ const ChefPostingSystem = () => {
       image:
         "https://images.unsplash.com/photo-1529006557810-274b9b2fc783?w=800&h=600&fit=crop",
       tags: ["Middle Eastern", "vegan", "halal"],
-      culturalNote:
+      dishMatters:
         "Street food from my childhood. Simple, healthy, and full of flavor!",
       rating: 4.7,
       orders: 18,
       originKey: "middle eastern",
-      lat: ORIGIN_COORDS["middle eastern"].lat,
-      lng: ORIGIN_COORDS["middle eastern"].lng,
+      lat: 30.0444,
+      lng: 31.2357,
     },
     {
       id: 4,
@@ -128,13 +134,13 @@ const ChefPostingSystem = () => {
       image:
         "https://images.unsplash.com/photo-1565299585323-38d6b0865b47?w=800&h=600&fit=crop",
       tags: ["Mexican", "vegetarian", "spicy-hot"],
-      culturalNote:
+      dishMatters:
         "Every taco tells a story. These are inspired by my abuela's secret recipes!",
       rating: 4.6,
       orders: 15,
       originKey: "mexican",
-      lat: ORIGIN_COORDS["mexican"].lat,
-      lng: ORIGIN_COORDS["mexican"].lng,
+      lat: 19.4326,
+      lng: -99.1332,
     },
   ];
 
@@ -151,12 +157,26 @@ const ChefPostingSystem = () => {
     { name: "spicy-hot" },
   ];
 
+  // --------- Fetch meals from BACKEND on mount ---------
   useEffect(() => {
-    setMeals(sampleMeals);
-    setFilteredMeals(sampleMeals);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const fetchMeals = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/meals`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        setMeals(data);
+        setFilteredMeals(data);
+      } catch (err) {
+        console.error("Error fetching meals, using sample data:", err);
+        setMeals(sampleMeals);
+        setFilteredMeals(sampleMeals);
+      }
+    };
+
+    fetchMeals();
   }, []);
 
+  // --------- Filter + search whenever query / filters change ---------
   useEffect(() => {
     let filtered = meals;
 
@@ -166,13 +186,15 @@ const ChefPostingSystem = () => {
         (meal) =>
           meal.title.toLowerCase().includes(q) ||
           (meal.description || "").toLowerCase().includes(q) ||
-          meal.tags.some((tag) => tag.toLowerCase().includes(q))
+          (meal.tags || []).some((tag) =>
+            tag.toLowerCase().includes(q)
+          )
       );
     }
 
     if (selectedFilters.length > 0) {
       filtered = filtered.filter((meal) =>
-        selectedFilters.every((f) => meal.tags.includes(f))
+        selectedFilters.every((f) => (meal.tags || []).includes(f))
       );
     }
 
@@ -185,28 +207,37 @@ const ChefPostingSystem = () => {
     );
   };
 
-  const handleBuyTicket = (meal) => {
-    if (meal.servingsLeft > 0) {
-      setMeals((prev) =>
-        prev.map((m) =>
-          m.id === meal.id ? { ...m, servingsLeft: m.servingsLeft - 1 } : m
-        )
+  const handleBuyTicket = async (meal) => {
+    if (meal.servingsLeft <= 0) return;
+
+    try {
+      const res = await fetch(
+        `${API_BASE_URL}/api/meals/${meal.id}/reserve`,
+        {
+          method: "PATCH",
+        }
       );
+      if (!res.ok) throw new Error("Failed to reserve meal");
+      const updated = await res.json();
+
+      setMeals((prev) =>
+        prev.map((m) => (m.id === updated.id ? updated : m))
+      );
+
       const note = {
         id: Date.now(),
-        message: `Successfully reserved ${meal.title}!`,
+        message: `Successfully reserved ${updated.title}!`,
         time: new Date(),
       };
       setNotifications((prev) => [note, ...prev]);
       alert(`Meal reserved! You'll receive pickup details soon.`);
+    } catch (err) {
+      console.error(err);
+      alert("Error reserving meal. Please try again.");
     }
   };
 
-  const safeTagClass = (tag) => {
-    return "tag_" + tag.replace(/[^a-zA-Z0-9]/g, "_");
-  };
-
-  /* ---------- Views ---------- */
+  // --------- Views ---------
 
   const LoginView = () => (
     <div className={styles.loginWrapper}>
@@ -279,10 +310,7 @@ const ChefPostingSystem = () => {
 
   const MealCard = ({ meal }) => {
     return (
-      <div
-        className={styles.card}
-        onClick={() => setSelectedMeal(meal)}
-      >
+      <div className={styles.card} onClick={() => setSelectedMeal(meal)}>
         <div className={styles.cardImageWrapper}>
           <img
             src={meal.image}
@@ -312,7 +340,7 @@ const ChefPostingSystem = () => {
           </div>
 
           <div className={styles.tagRow}>
-            {meal.tags.map((tag) => {
+            {(meal.tags || []).map((tag) => {
               const safe = safeTagClass(tag);
               return (
                 <span
@@ -427,14 +455,16 @@ const ChefPostingSystem = () => {
             <div className={styles.modalRating}>
               <Star className={styles.ratingIconSmall} />
               <span className={styles.ratingText}>{meal.rating}</span>
-              <span className={styles.ordersText}>
-                ({meal.orders} orders)
-              </span>
+              {typeof meal.orders !== "undefined" && (
+                <span className={styles.ordersText}>
+                  ({meal.orders} orders)
+                </span>
+              )}
             </div>
           </div>
 
           <div className={styles.modalTags}>
-            {meal.tags.map((tag) => {
+            {(meal.tags || []).map((tag) => {
               const safe = safeTagClass(tag);
               return (
                 <span
@@ -459,13 +489,21 @@ const ChefPostingSystem = () => {
                 Why this dish matters to me
               </span>
             </div>
-            <p className={styles.noteText}>"{meal.culturalNote}"</p>
+            <p className={styles.noteText}>
+              "
+              {meal.dishMatters ||
+                meal.culturalNote ||
+                "No story added yet."}
+              "
+            </p>
           </div>
 
           <div className={styles.section}>
             <h3 className={styles.sectionTitle}>About the Chef</h3>
             <div className={styles.chefRow}>
-              <div className={styles.chefAvatar}>{meal.chef.charAt(0)}</div>
+              <div className={styles.chefAvatar}>
+                {meal.chef?.charAt(0)}
+              </div>
               <div>
                 <div className={styles.chefName}>{meal.chef}</div>
                 <div className={styles.chefBio}>{meal.chefBio}</div>
@@ -508,11 +546,15 @@ const ChefPostingSystem = () => {
       description: "",
       price: "",
       servings: "",
-      culturalNote: "",
+      servingsLeft: "",
+      image: "", // fallback URL if user pastes one
+      originKey: "", // empty means "no origin selected"
       tags: [],
-      image: "",
-      originKey: "generic",
+      dishMatters: "",
     });
+
+    const [imageFile, setImageFile] = useState(null);
+    const [imagePreview, setImagePreview] = useState("");
 
     const toggleTag = (t) => {
       setFormData((prev) => ({
@@ -523,34 +565,72 @@ const ChefPostingSystem = () => {
       }));
     };
 
-    const submit = () => {
-      const origin =
-        ORIGIN_COORDS[formData.originKey] || ORIGIN_COORDS["generic"];
+    const submit = async () => {
+      try {
+        let imageUrl = formData.image || "";
 
-      const newMeal = {
-        id: Date.now(),
-        title: formData.title || "Untitled Meal",
-        description: formData.description || "",
-        chef: user.name,
-        chefBio: "Student chef",
-        dorm: user.dorm,
-        price: Number(formData.price) || 0,
-        servings: Number(formData.servings) || 1,
-        servingsLeft: Number(formData.servings) || 1,
-        image:
-          formData.image ||
-          "https://images.unsplash.com/photo-1466637574441-749b8f19452f?w=800&h=600&fit=crop",
-        tags: formData.tags,
-        culturalNote: formData.culturalNote,
-        rating: 5.0,
-        orders: 0,
-        originKey: formData.originKey,
-        lat: origin.lat,
-        lng: origin.lng,
-      };
-      setMeals((prev) => [newMeal, ...prev]);
-      setShowCreatePost(false);
-      alert("Meal posted successfully!");
+        // 1) Upload file if user picked one
+        if (imageFile) {
+          const fd = new FormData();
+          fd.append("image", imageFile);
+
+          const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
+            method: "POST",
+            body: fd,
+          });
+
+          if (!uploadRes.ok) throw new Error("Image upload failed");
+
+          const { url } = await uploadRes.json();
+          imageUrl = url;
+        }
+
+        // 2) Only set coordinates if originKey is provided AND we know it
+        let lat = undefined;
+        let lng = undefined;
+        const originKey = formData.originKey || null;
+        if (originKey && ORIGIN_COORDS[originKey]) {
+          lat = ORIGIN_COORDS[originKey].lat;
+          lng = ORIGIN_COORDS[originKey].lng;
+        }
+
+        const newMealPayload = {
+          title: formData.title || "Untitled Meal",
+          description: formData.description || "",
+          chef: user?.name || "Anonymous Chef",
+          chefBio: "Student chef",
+          dorm: user?.dorm || "Unknown Dorm",
+          price: Number(formData.price) || 0,
+          servings: Number(formData.servings) || 1,
+          servingsLeft:
+            Number(formData.servingsLeft || formData.servings) || 1,
+          image:
+            imageUrl ||
+            "https://images.unsplash.com/photo-1466637574441-749b8f19452f?w=800&h=600&fit=crop",
+          tags: formData.tags,
+          dishMatters: formData.dishMatters || "",
+          rating: 5.0,
+          orders: 0,
+          originKey,
+          lat,
+          lng,
+        };
+
+        const res = await fetch(`${API_BASE_URL}/api/meals`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(newMealPayload),
+        });
+        if (!res.ok) throw new Error("Failed to create meal");
+
+        const saved = await res.json();
+        setMeals((prev) => [saved, ...prev]);
+        setShowCreatePost(false);
+        alert("Meal posted successfully!");
+      } catch (err) {
+        console.error("Error posting meal:", err);
+        alert("Error posting meal. Please try again.");
+      }
     };
 
     return (
@@ -592,18 +672,43 @@ const ChefPostingSystem = () => {
               <div className={styles.uploadBox}>
                 <ChefHat className={styles.uploadIcon} />
                 <p className={styles.smallMuted}>
-                  Click to upload or drag and drop
+                  Click to upload an image of your dish
                 </p>
                 <input
-                  className={styles.hiddenFile}
-                  type="text"
-                  placeholder="Image URL (optional)"
-                  value={formData.image}
-                  onChange={(e) =>
-                    setFormData({ ...formData, image: e.target.value })
-                  }
+                  type="file"
+                  accept="image/*"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setImageFile(file);
+                      setImagePreview(URL.createObjectURL(file));
+                    }
+                  }}
                 />
               </div>
+
+              {imagePreview && (
+                <div style={{ marginTop: "0.5rem" }}>
+                  <p className={styles.smallMuted}>Preview:</p>
+                  <img
+                    src={imagePreview}
+                    alt="Preview"
+                    style={{ maxWidth: "220px", borderRadius: "8px" }}
+                  />
+                </div>
+              )}
+
+              {/* Optional text URL fallback:
+              <input
+                className={styles.input}
+                type="text"
+                placeholder="or paste an image URL"
+                value={formData.image}
+                onChange={(e) =>
+                  setFormData({ ...formData, image: e.target.value })
+                }
+              />
+              */}
             </div>
 
             <div>
@@ -646,7 +751,7 @@ const ChefPostingSystem = () => {
                   setFormData({ ...formData, originKey: e.target.value })
                 }
               >
-                <option value="generic">Select origin</option>
+                <option value="">No origin selected</option>
                 <option value="punjabi">Punjabi / North Indian</option>
                 <option value="japanese">Japanese</option>
                 <option value="middle eastern">Middle Eastern</option>
@@ -660,6 +765,7 @@ const ChefPostingSystem = () => {
                 {allTags.map((t) => (
                   <button
                     key={t.name}
+                    type="button"
                     onClick={() => toggleTag(t.name)}
                     className={`${styles.filterTag} ${
                       formData.tags.includes(t.name)
@@ -680,11 +786,11 @@ const ChefPostingSystem = () => {
               <textarea
                 rows="2"
                 className={styles.textarea}
-                value={formData.culturalNote}
+                value={formData.dishMatters}
                 onChange={(e) =>
                   setFormData({
                     ...formData,
-                    culturalNote: e.target.value,
+                    dishMatters: e.target.value,
                   })
                 }
                 placeholder="Share the story behind this meal..."
@@ -695,10 +801,15 @@ const ChefPostingSystem = () => {
               style={{ gridColumn: "1 / -1" }}
               className={styles.formActions}
             >
-              <button className={styles.primaryButton} onClick={submit}>
+              <button
+                type="button"
+                className={styles.primaryButton}
+                onClick={submit}
+              >
                 Post Meal
               </button>
               <button
+                type="button"
                 className={styles.ghostButton}
                 onClick={() => setShowCreatePost(false)}
               >
@@ -715,7 +826,9 @@ const ChefPostingSystem = () => {
     <div className={styles.profileWrapper}>
       <div className={styles.profileCard}>
         <div className={styles.profileTop}>
-          <div className={styles.profileAvatar}>{user.name.charAt(0)}</div>
+          <div className={styles.profileAvatar}>
+            {user.name.charAt(0)}
+          </div>
           <div>
             <h2 className={styles.h2}>{user.name}</h2>
             <p className={styles.smallMuted}>{user.email}</p>
@@ -833,7 +946,9 @@ const ChefPostingSystem = () => {
                   selectedChat?.id === c.id ? styles.chatItemActive : ""
                 }`}
               >
-                <div className={styles.chatAvatar}>{c.name.charAt(0)}</div>
+                <div className={styles.chatAvatar}>
+                  {c.name.charAt(0)}
+                </div>
                 <div className={styles.chatInfo}>
                   <div className={styles.chatTop}>
                     <div className={styles.chatName}>{c.name}</div>
@@ -886,7 +1001,7 @@ const ChefPostingSystem = () => {
                   placeholder="Type a message..."
                   value={chatMessage}
                   onChange={(e) => setChatMessage(e.target.value)}
-                  onKeyPress={(e) => {
+                  onKeyDown={(e) => {
                     if (e.key === "Enter" && chatMessage.trim()) {
                       setChatMessage("");
                     }
@@ -909,6 +1024,14 @@ const ChefPostingSystem = () => {
   };
 
   /* ---------- Top-level render ---------- */
+
+  // Only meals that have coordinates should appear on the globe
+  const mealsForGlobe = filteredMeals.filter(
+    (m) =>
+      m.originKey &&
+      typeof m.lat === "number" &&
+      typeof m.lng === "number"
+  );
 
   return (
     <div className={styles.app}>
@@ -981,7 +1104,7 @@ const ChefPostingSystem = () => {
             >
               <MessageCircle />
               {notifications.length > 0 && (
-                <span className={styles.badge}>2</span>
+                <span className={styles.badge}>{notifications.length}</span>
               )}
             </button>
 
@@ -1013,7 +1136,7 @@ const ChefPostingSystem = () => {
           <FeedView />
         ) : currentView === "globe" ? (
           <GlobeView
-            meals={filteredMeals}
+            meals={mealsForGlobe}
             selectedMeal={selectedMeal}
             onSelectMeal={setSelectedMeal}
             onReserveMeal={handleBuyTicket}
